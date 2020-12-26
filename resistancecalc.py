@@ -5,12 +5,30 @@ Created on Sun Dec 20 20:21:38 2020
 @author: etale
 """
 
-
 from itertools import permutations
 from collections import Counter
+import sys
+import re
+
+def ReadCmd():
+    l=[0,2,0,0]
+    for x in sys.argv[1:]:
+        #-r=rangetype
+        if bool(re.fullmatch(r"-r=[01]",x)):
+            l[0]=int(x[3])            
+        #-d=difficulty
+        if bool(re.fullmatch(r"-d=[012]",x)):
+            l[1]=int(x[3])
+        #-inf = infinity y/n
+        if bool(re.fullmatch(r"-inf",x)):
+            l[2]=1
+        #-cm=cold mastery lvl
+        if bool(re.fullmatch(r"-cm=\d+",x)):
+            l[3]=int(x[4:])
+    return l
 
 #Resistances - 0 Phys, 1 Mag, 2 Cold, 3 Fire, 4 Light, 5 Poison
-Resists=[50,100,0,0,0,75] #Plague Bearer (Hell)
+#Resists=[50,100,0,0,0,75] #Plague Bearer (Hell)
 
 def lowerCap(Res):
     """
@@ -242,4 +260,9 @@ def PercentageList(Res,ResType,rangedtype,difficulty,inf,CM):
     for a in d:
         print("{}: {}".format(a[0],a[1]))
 
-PercentageList(Resists,2,0,2,1,37)
+#sys.argv.append("-cm=27")
+l=ReadCmd()
+Resists=[int(x) for x in input("Enter Resistances: ").split(" ")]
+for i in range(0,6):
+    print("")
+    PercentageList(Resists,i,l[0],l[1],l[2],l[3])
