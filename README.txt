@@ -44,3 +44,32 @@ The following parameters are available
 	
 	-cm=?		Cold Mastery lvl given by ?.
 				Default: ?=0
+
+	-ecr=?		-% Enemy Cold Resist given by ?.
+				Default: ?=0
+
+	-efr=?		-% Enemy Fire Resist given by ?.
+				Default: ?=0
+
+	-elr=?		-% Enemy Lightning Resist given by ?.
+				Default: ?=0
+
+	-epr=?		-% Enemy Poison Resist given by ?.
+				Default: ?=0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

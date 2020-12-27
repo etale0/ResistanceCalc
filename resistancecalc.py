@@ -10,25 +10,36 @@ from collections import Counter
 import sys
 import re
 
+#sys.argv.extend(["-elr=20","-inf"])
+
 def ReadCmd():
-    l=[0,2,0,0]
-    for x in sys.argv[1:]:
+    l=[0,2,0,0,[0,0,0,0]]
+    for x in sys.argv:
         #-r=rangetype
         if bool(re.fullmatch(r"-r=[01]",x)):
             l[0]=int(x[3])            
         #-d=difficulty
         if bool(re.fullmatch(r"-d=[012]",x)):
             l[1]=int(x[3])
-        #-inf = infinity y/n
+        #-inf = infinity y/n?
         if bool(re.fullmatch(r"-inf",x)):
             l[2]=1
         #-cm=cold mastery lvl
         if bool(re.fullmatch(r"-cm=\d+",x)):
             l[3]=int(x[4:])
+        #-ecr=-% Enemey Cold Resist
+        if bool(re.fullmatch(r"-ecr=\d+",x)):
+            l[4][0]=int(x[5:])
+        #-efr=-% Enemey Fire Resist
+        if bool(re.fullmatch(r"-efr=\d+",x)):
+            l[4][1]=int(x[5:])
+        #-elr=-% Enemey Lightning Resist
+        if bool(re.fullmatch(r"-elr=\d+",x)):
+            l[4][2]=int(x[5:])
+        #-epr=-% Enemey Poison Resist
+        if bool(re.fullmatch(r"-epr=\d+",x)):
+            l[4][3]=int(x[5:])
     return l
-
-#Resistances - 0 Phys, 1 Mag, 2 Cold, 3 Fire, 4 Light, 5 Poison
-#Resists=[50,100,0,0,0,75] #Plague Bearer (Hell)
 
 def lowerCap(Res):
     """
@@ -62,6 +73,23 @@ def Infinity(Res):
             a[i]-=85
         else:
             a[i]-=17
+    return lowerCap(a)
+
+def MinusRes(Res,ExR):
+    """
+    Parameters
+    ----------
+    Res: Resistance Array [0 Phys, 1 Mag, 2 Cold, 3 Fire, 4 Light, 5 Poison]
+    ExR: -% Enemy x Resistance [cold, fire, lightning, poison]
+
+    Returns
+    -------
+    Resistances after the application of the -% Enemy x Resistances in ExR.
+    """
+    a=Res[:]
+    for i in range(2,6):
+        if a[i]<100:
+            a[i]-=ExR[i-2]
     return lowerCap(a)
 
 def ColdMastery(Res,CM):
@@ -199,7 +227,7 @@ def ChangeRes(Res,Mod):
 
 res_dict={0:"Physical",1:"Magic",2:"Cold",3:"Fire",4:"Lightning",5:"Poison"}
 
-def ResistList(Res,rangedtype,difficulty,inf,CM):
+def ResistList(Res,rangedtype,difficulty,inf,CM,ExR):
     """
     Parameters
     ----------
@@ -208,6 +236,7 @@ def ResistList(Res,rangedtype,difficulty,inf,CM):
     difficulty: 0=Normal, 1=Nightmare, 2=Hell
     inf: 0=no Conviction, 1=lvl 12 Conviction
     CM: Cold Mastery lvl. Adds -(15+5*CM) to cold resistance if not immune
+    ExR: -% Enemy x Resistance [cold, fire, lightning, poison]
     
     Magic Resistant may not spawn in Normal difficulty and Multiple Shot only
     spawns for monsters that have rangetype set to 1.
@@ -228,11 +257,12 @@ def ResistList(Res,rangedtype,difficulty,inf,CM):
             x=Infinity(x)
         if CM:
             x=ColdMastery(x,CM)
+        x=MinusRes(x,ExR)
         l.append(x)
     r=tuple(zip(*l))
     return [Counter(r[i]) for i in range(0,6)]
 
-def PercentageList(Res,ResType,rangedtype,difficulty,inf,CM):
+def PercentageList(Res,ResType,rangedtype,difficulty,inf,CM,ExR):
     '''
     Returns a list of possible resistances and their probability for the given
     rangedtype, difficulty and ResType
@@ -245,6 +275,7 @@ def PercentageList(Res,ResType,rangedtype,difficulty,inf,CM):
     difficulty: 0=Normal, 1=Nightmare, 2=Hell
     inf: 0=no Conviction, 1=lvl 12 Conviction
     CM: Cold Mastery lvl. Adds -(15+5*CM) to cold resistance if CM and not immune
+    ExR: -% Enemy x Resistance
 
     Returns
     -------
@@ -255,14 +286,19 @@ def PercentageList(Res,ResType,rangedtype,difficulty,inf,CM):
         for i in d.keys():
             d[i]="{:.2%}".format(d[i]/t)
         return d
-    d=sorted(pCounter(ResistList(Res,rangedtype,difficulty,inf,CM)[ResType]).items())
+    ResList=ResistList(Res,rangedtype,difficulty,inf,CM,ExR)
+    d=sorted(pCounter(ResList[ResType]).items())
     print(res_dict[ResType]+":")
     for a in d:
         print("{}: {}".format(a[0],a[1]))
 
+
+#Plague Bearer (Hell)
+Resists=[50,100,0,0,0,75]
+
 #sys.argv.append("-cm=27")
 l=ReadCmd()
-Resists=[int(x) for x in input("Enter Resistances: ").split(" ")]
+#Resists=[int(x) for x in input("Enter Resistances: ").split(" ")]
 for i in range(0,6):
     print("")
-    PercentageList(Resists,i,l[0],l[1],l[2],l[3])
+    PercentageList(Resists,i,l[0],l[1],l[2],l[3],l[4])
