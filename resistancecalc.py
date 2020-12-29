@@ -12,6 +12,11 @@ import re
 
 sys.argv.extend(["-elr=20", "-conv=11", "-cm=5"])
 
+diff_dic = {0: "Normal", 1: "Nightmare", 2: "Hell"}
+
+res_dic = {0: "Physical", 1:"Magic", 2: "Cold", 
+            3: "Fire", 4: "Lightning", 5: "Poison"}
+
 class Parameters:
     def __init__(self, parms):
         """
@@ -25,9 +30,21 @@ class Parameters:
         self.er = parms[3]
         self.rtype = parms[4]
         self.diff = parms[5]
+        self.leap = parms[6]
+    def __str__(self):
+        info_str = "*************************\n"
+        info_str += "Difficulty: {}\n".format(diff_dic[self.diff])
+        info_str += "Ranged Type: {}\n".format("Yes" if self.rtype else "No")
+        info_str += "Conviction Level: {}\n".format(self.conv)
+        info_str += "Lower Resist Level: {}\n".format(self.lr)
+        info_str += "Cold Mastery Level: {}\n".format(self.cm)
+        info_str += "-% Enemy Resist: \n"
+        info_str += "\n".join("\t{}: {}".format(res_dic[i], self.er[i]) for i in range(0, 6))
+        info_str += "\n*************************"
+        return info_str
 
 def read_cmd():
-    par = Parameters([0, 0, 0, 6*[0], 0, 2])
+    par = Parameters([0, 0, 0, 6*[0], 0, 2, 0])
     for x in sys.argv:
         #-conv=conviction lvl
         if bool(re.fullmatch(r"-conv=\d+", x)):
@@ -56,7 +73,12 @@ def read_cmd():
         #-d=difficulty
         if bool(re.fullmatch(r"-d=[012]", x)):
             par.diff = int(x[3])
+        #-leap=leaper y/n
+        if bool(re.fullmatch(r"-leap", x)):
+            par.leap = 1
     return par
+
+print(read_cmd())
 
 def dimin(x, a, b):
     """
@@ -113,11 +135,6 @@ class ResistVector:
         '''
         new_vec=[x-malus[i] if x < 100 else x for (i, x) in enumerate(self.res)]
         return ResistVector(new_vec).lower_cap()
-    def immunities(self):
-        """
-        Counts the number of immunities in the ResistVector.
-        """
-        return sum(1 for x in self.res if 100 <= x)
     def cold_mastery(self, slvl):
         '''
         Applies slvl Cold Mastery to the Resist Vector, for reference:
@@ -130,40 +147,19 @@ class ResistVector:
         return ResistVector(new_vec).lower_cap()
     def generic_bonus(self, res_type, bonus):
         '''
+        IN PLACE
         Applies bonus to resistance of type res_type if this does not result
         in a third immunity or increases one of two or more immunities.
         '''
-        new_vec = self.res[:]
-        if new_vec[res_type] < 100-bonus:
-            new_vec[res_type] += bonus
-        elif 2 <= self.immunities():
+        if self.res[res_type] < 100-bonus:
+            self.res[res_type] += bonus
+        elif 2 <= sum(1 for x in self.res if 100 <= x):
             pass
         else:
-            new_vec[res_type] += bonus
-        return ResistVector(new_vec).lower_cap()
-    def magic_resistant(self):
-        """
-        Applies +40 to Cold, Fire and Lightning Resistance in this order, but
-        only if the respective resistance is less than 100 and this would not
-        result in a third immunity or increase one of two or more immunities.
-        """
-        new_resvec=ResistVector(self.res[:])
-        for i in range(2, 5):
-            if new_resvec.res[i] < 100:
-                new_resvec = new_resvec.generic_bonus(i, 40)
-        return new_resvec
-    def spectral_hit(self):
-        """
-        Applies +20 to Cold, Fire and Lightning Resistance in this order, but
-        only if the respective resistance is less than 75.
-        """
-        new_vec=self.res[:]
-        for i in range(2, 5):
-            if new_vec[i] < 75:
-                new_vec[i] += 20
-        return ResistVector(new_vec)
+            self.res[res_type] += bonus
     def apply_mod(self, mod):
         """
+        IN PLACE
         Applies the resistance bonus of "mod" to the Resist Vector. Key:
         SS - Stone Skin             +50 to phys. resistance
         MB - Mana Burn              +20 to magic resistance
@@ -178,23 +174,23 @@ class ResistVector:
                                     or increase one of two immunities
            - else                   +0 to all       
         """
-        new_resvec=ResistVector(self.res[:])
         if mod == "MR":
-            new_resvec=new_resvec.magic_resistant()
+            for i in range(2, 5):
+                if self.res[i] < 100:
+                    self.generic_bonus(i, 40)
         elif mod == "SH":
-            new_resvec=new_resvec.spectral_hit()
+            for i in range(2, 5):
+                if self.res[i] < 75:
+                    self.res[i] += 20
         else:
-            new_resvec=new_resvec.generic_bonus(mod_dic[mod][0], mod_dic[mod][1])
-        return new_resvec
+            self.generic_bonus(mod_dic[mod][0], mod_dic[mod][1])
 
 
-res_dict = {0: "Physical", 1:"Magic", 2: "Cold", 
-            3: "Fire", 4: "Lightning", 5: "Poison"}
 
 def resist_list(resistances, par):
     """
     Magic Resistant may not spawn in Normal difficulty and Multiple Shot only
-    spawns for monsters that have rangetype set to 1.
+    spawns for monsters that have rtype set to 1.
     
     Returns
     -------
@@ -202,12 +198,13 @@ def resist_list(resistances, par):
     resistances as keys and the number of their occurence in all the possible
     modifier permutations as values.
     """
-    mods = [""]*(5+par.rtype)+["FE", "CE", "LE", "SS", "SH", "MB"]+["MR"]*(par.diff != 0)
+    mods = ["FE", "CE", "SS", "SH", "MB"]
+    mods.extend(["LE"]*(par.leap == 0)+[""]*(5+par.rtype)+["MR"]*(par.diff != 0))
     l = []
     for i in permutations(mods, par.diff+1):
         temp = ResistVector(resistances.res[:])
         for j in range(0, par.diff+1):
-            temp = temp.apply_mod(i[j])
+            temp.apply_mod(i[j])
         if par.conv:
             temp = temp.conviction(par.conv)
         if par.lr:
@@ -223,21 +220,20 @@ def resist_list(resistances, par):
 def percentage_list(resistances, res_type, par):
     '''
     Returns a list of possible resistances and their probability for the given
-    rangedtype, difficulty and ResType
+    res_type.
 
     Parameters
     ----------
     res_type: Resistance Type
     '''
-    def pCounter(dic):
+    def percentages(dic):
         total = sum(dic.values())
         return {key:"{:.2%}".format(dic[key]/total) for key in dic.keys()}
     res_list = resist_list(resistances, par)
-    pairs = sorted(pCounter(res_list[res_type]).items())
-    print(res_dict[res_type]+":")
+    pairs = sorted(percentages(res_list[res_type]).items())
+    print(res_dic[res_type]+":")
     for a in pairs:
         print("{}: {}".format(a[0], a[1]))
-
 
 #Plague Bearer (Hell)
 Resists = ResistVector([50, 100, 0, 0, 0, 75])
