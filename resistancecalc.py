@@ -10,7 +10,7 @@ from collections import Counter
 import sys
 import re
 
-sys.argv.extend(["-elr=20", "-conv=11", "-cm=5"])
+sys.argv.extend(["-elr=0", "-conv=0", "-cm=0", "-lr=0"])
 
 diff_dic = {0: "Normal", 1: "Nightmare", 2: "Hell"}
 
@@ -51,7 +51,7 @@ def read_cmd():
             par.conv = int(x[6:])
         #-lr=lower resist lvl
         if bool(re.fullmatch(r"-lr=\d+", x)):
-            par.lr = int(x[5:])
+            par.lr = int(x[4:])
         #-cm=cold mastery lvl
         if bool(re.fullmatch(r"-cm=\d+", x)):
             par.cm = int(x[4:])
@@ -101,50 +101,49 @@ class ResistVector:
         self.res = resistances
     def lower_cap(self):
         """
+        IN PLACE
         Applies the lower cap of -100 to the ResistVector.        
         """
-        return ResistVector([max(-100, x) for x in self.res])
+        self.res=[max(-100, x) for x in self.res]
     def conviction(self, slvl = 0):
         """
+        IN PLACE
         Applies slvl Conviction to the ResistVector, for reference:
             Fire/Cold/Lightning Resist -% = min(25+5*slvl,150)                
         """
         malus = min(25+5*slvl, 150) if slvl else 0
-        new_vec = self.res[:2]
         for i in range(2, 5):
-            new_res = self.res[i]-(malus if self.res[i] < 100 else malus//5)
-            new_vec.append(new_res)
-        new_vec.append(self.res[5])
-        return ResistVector(new_vec).lower_cap()
+            self.res[i] = self.res[i]-(malus if self.res[i] < 100 else malus//5)
+        self.lower_cap()
     def lower_resist(self, slvl):
         """
+        IN PLACE
         Applies slvl Lower Resist to the ResistVector, for reference:
             Fire/Cold/Light/Poison Resist -% = min(25+45*dimin(slvl,110,6)/100), 70)                
         with dimin(slvl,110,6)=110*slvl/(6+slvl)
         """
         malus = min(25+(45*dimin(slvl, 110, 6))//100, 70) if slvl else 0
-        new_vec = self.res[:2]
         for i in range(2, 6):
-            new_res = self.res[i]-(malus if self.res[i] < 100 else malus//5)
-            new_vec.append(new_res)
-        return ResistVector(new_vec).lower_cap()
+            self.res[i] = self.res[i]-(malus if self.res[i] < 100 else malus//5)
+        self.lower_cap()
     def enemy_resist(self, malus):
         '''
+        IN PLACE
         Applies the malus vector consisting of -EPR, -EMR, -ECR, -EFR, -ELR
         and -EPR. to the ResistVector.
         '''
-        new_vec=[x-malus[i] if x < 100 else x for (i, x) in enumerate(self.res)]
-        return ResistVector(new_vec).lower_cap()
+        self.res=[x-malus[i] if x < 100 else x for (i, x) in enumerate(self.res)]
+        self.lower_cap()
     def cold_mastery(self, slvl):
         '''
+        IN PLACE
         Applies slvl Cold Mastery to the Resist Vector, for reference:
             Cold Resist -% = 15+5*slvl
         '''
-        new_vec = self.res[:]
         malus = 15+5*slvl if slvl else 0
-        if new_vec[2] < 100:
-            new_vec[2] -= malus
-        return ResistVector(new_vec).lower_cap()
+        if self.res[2] < 100:
+            self.res[2] -= malus
+        self.lower_cap()
     def generic_bonus(self, res_type, bonus):
         '''
         IN PLACE
@@ -201,23 +200,27 @@ def resist_list(resistances, par):
     mods = ["FE", "CE", "SS", "SH", "MB"]
     mods.extend(["LE"]*(par.leap == 0)+[""]*(5+par.rtype)+["MR"]*(par.diff != 0))
     l = []
+    def temp_func(res_vec,par,mod_vec):
+        for j in range(0, par.diff+1):
+            res_vec.apply_mod(mod_vec[j])
+        if par.conv:
+            res_vec.conviction(par.conv)
+        if par.lr:
+            res_vec.lower_resist(par.lr)
+        if par.cm:
+            res_vec.cold_mastery(par.cm)
+        if sum(par.er):
+            res_vec.enemy_resist(par.er)
+        return res_vec
+        
     for i in permutations(mods, par.diff+1):
         temp = ResistVector(resistances.res[:])
-        for j in range(0, par.diff+1):
-            temp.apply_mod(i[j])
-        if par.conv:
-            temp = temp.conviction(par.conv)
-        if par.lr:
-            temp = temp.lower_resist(par.lr)
-        if par.cm:
-            temp = temp.cold_mastery(par.cm)
-        if sum(par.er):
-            temp = temp.enemy_resist(par.er)
+        temp = temp_func(temp, par, i)
         l.append(temp.res)
     r = tuple(zip(*l))
     return [Counter(r[i]) for i in range(0, 6)]
 
-def percentage_list(resistances, res_type, par):
+def percentage_list(resistances, par):
     '''
     Returns a list of possible resistances and their probability for the given
     res_type.
@@ -230,15 +233,16 @@ def percentage_list(resistances, res_type, par):
         total = sum(dic.values())
         return {key:"{:.2%}".format(dic[key]/total) for key in dic.keys()}
     res_list = resist_list(resistances, par)
-    pairs = sorted(percentages(res_list[res_type]).items())
-    print(res_dic[res_type]+":")
-    for a in pairs:
-        print("{}: {}".format(a[0], a[1]))
+    for i in range(0,6):
+        pairs = sorted(percentages(res_list[i]).items())
+        print("\n{}:".format(res_dic[i]))
+        for a in pairs:
+            print("{}: {}".format(a[0], a[1]))
 
 #Plague Bearer (Hell)
-Resists = ResistVector([50, 100, 0, 0, 0, 75])
+#Resists = ResistVector([50, 100, 0, 0, 0, 75])
 
-#Resists=[int(x) for x in input("Enter Resistances: ").split(" ")]
-for i in range(0, 6):
-    print("")
-    percentage_list(Resists, i, read_cmd())
+Resists=ResistVector([int(x) for x in input("Enter Resistances: ").split(" ")])
+
+
+percentage_list(Resists, read_cmd())
