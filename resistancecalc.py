@@ -202,7 +202,8 @@ def resist_list(resistances, par):
     l = []
     def temp_func(res_vec,par,mod_vec):
         for j in range(0, par.diff+1):
-            res_vec.apply_mod(mod_vec[j])
+            if mod_vec[j]!="":
+                res_vec.apply_mod(mod_vec[j])
         if par.conv:
             res_vec.conviction(par.conv)
         if par.lr:
@@ -240,9 +241,9 @@ def percentage_list(resistances, par):
             print("{}: {}".format(a[0], a[1]))
 
 #Plague Bearer (Hell)
-#Resists = ResistVector([50, 100, 0, 0, 0, 75])
+Resists = ResistVector([50, 100, 0, 0, 0, 75])
 
-Resists=ResistVector([int(x) for x in input("Enter Resistances: ").split(" ")])
+#Resists=ResistVector([int(x) for x in input("Enter Resistances: ").split(" ")])
 
 
 percentage_list(Resists, read_cmd())
