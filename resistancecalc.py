@@ -10,7 +10,7 @@ from collections import Counter
 import sys
 import re
 
-sys.argv.extend(["-elr=0", "-conv=0", "-cm=0", "-lr=0"])
+sys.argv.extend(["-conv=12", "-r=1"])
 
 diff_dic = {0: "Normal", 1: "Nightmare", 2: "Hell"}
 
@@ -241,9 +241,9 @@ def percentage_list(resistances, par):
             print("{}: {}".format(a[0], a[1]))
 
 #Plague Bearer (Hell)
-Resists = ResistVector([50, 100, 0, 0, 0, 75])
+#Resists = ResistVector([50, 100, 0, 0, 0, 75])
 
-#Resists=ResistVector([int(x) for x in input("Enter Resistances: ").split(" ")])
+Resists=ResistVector([int(x) for x in input("Enter Resistances: ").split(" ")])
 
 
 percentage_list(Resists, read_cmd())
